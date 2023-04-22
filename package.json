@@ -1,0 +1,22 @@
+{
+  "name": "dummy-react",
+  "version": "1.0.0",
+  "description": "This is a dummy react project, where I attempt to create a simplified version of react without any of the optimizations",
+  "scripts": {
+    "start": "parcel public/index.html",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "React",
+    "DummyReact",
+    "ReactFromScratch"
+  ],
+  "author": "SMLukwiya",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.21.4",
+    "@babel/preset-react": "^7.18.6",
+    "parcel": "^2.8.3",
+    "typescript": "^5.0.4"
+  }
+}
