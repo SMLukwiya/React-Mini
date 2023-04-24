@@ -2,20 +2,12 @@ import DummyReact from "./library";
 
 // Telling babel to use our Dummy React instead of react (Parcel uses babel/core under the hood)
 /**@jsx DummyReact.createElement */
-const container = document.getElementById("root");
+function App(props) {
+  const [state, setState] = DummyReact.useState(1)
 
-const updateValue = e => {
-  rerender(e.target.value)
+  return <h1 onClick={() => setState(count => count + 1)}>Count: {state}</h1>
 }
 
-const rerender = (value) => {
-  const element = (
-    <div>
-      <input onInput={updateValue} value={value} />
-      <h2>Hello {value}</h2>
-    </div>
-  )
-  DummyReact.render(element, container);
-}
-
-rerender("World")
+const element = <App name="foo" />
+const container = document.getElementById("root")
+DummyReact.render(element, container)

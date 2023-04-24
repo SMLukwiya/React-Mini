@@ -33,9 +33,11 @@ let nextUnitOfWork = null
 let workInProgressRoot = null
 let currentRoot = null // will be reference to the previous committed fiber tree
 let deletions = null // store dom nodes to be deleted
+let workInProgressFiber = null
+let hooksIndex = null
 
   // Render from React Dom
-  function render(element, container) {
+function render(element, container) {
     // set up root node to start work
     workInProgressRoot = {
         domNode: container,
@@ -69,13 +71,14 @@ let deletions = null // store dom nodes to be deleted
 
 
 function performUnitOfWork(fiber) {
-    if (!fiber.domNode) {
-        // create dom node if doesn't exist
-        fiber.domNode = createDomNode(fiber)
-    }
+    // check for functional component
+    const isAFunctionalComponent = fiber.type instanceof Function
 
-    const elements = fiber.props.children
-    reconcileChildrenElements(fiber, elements)
+    if (isAFunctionalComponent) {
+        updateFunctionalComponent(fiber)
+    } else {
+        updateHostComponent(fiber)
+    }
 
     if (fiber.child) {
         // return child as next piece of work
@@ -91,6 +94,25 @@ function performUnitOfWork(fiber) {
         // no child && sibling found, go back up the tree to parent
         nextFiber = nextFiber.parent
     }
+}
+
+function updateFunctionalComponent(fiber) {
+    workInProgressFiber = fiber
+    hooksIndex = 0
+    workInProgressFiber.hooks = [] // support multiple hooks in the same component
+
+    const children = [fiber.type(fiber.props)]
+    reconcileChildrenElements(fiber, children)
+}
+
+function updateHostComponent(fiber) {
+    if (!fiber.domNode) {
+        // create dom node if doesn't exist
+        fiber.domNode = createDomNode(fiber)
+    }
+
+    const elements = fiber.props.children
+    reconcileChildrenElements(fiber, elements)
 }
 
 function reconcileChildrenElements(workInProgressFiber, elements) {
@@ -163,8 +185,13 @@ function commitWork(fiber) {
     if (!fiber) {
         return
     };
+
+    let domParentFiber = fiber.parent
+    while(!domParentFiber.domNode) {
+        domParentFiber = domParentFiber.parent
+    }
     
-    const domNodeParent = fiber.parent.domNode
+    const domNodeParent = domParentFiber.domNode
     if (fiber.effectTag === "INSERTION" && fiber.domNode !== null)  {
         // only append for new nodes/insertions nodes
         domNodeParent.appendChild(fiber.domNode)
@@ -173,11 +200,19 @@ function commitWork(fiber) {
         updateDomNode(fiber.domNode, fiber.alternate.props, fiber.props)
     } else if (fiber.effectTag === "DELETION") {
         // delete outdated nodes
-        domNodeParent.removeChild(fiber.domNode)
+        commitDeletion(fiber, domNodeParent)
     }
 
     commitWork(fiber.child) // go recursively on child elements first
     commitWork(fiber.sibling) // go recursively on sibling elements next
+}
+
+function commitDeletion(fiber, domNodeParent) {
+    if (fiber.domNode) {
+        document.removeChild(fiber.domNode)
+    } else {
+        commitDeletion(fiber.child, domNodeParent)
+    }
 }
 
 function updateDomNode(domNode, prevProps, nextProps) {
@@ -221,8 +256,40 @@ function updateDomNode(domNode, prevProps, nextProps) {
         })
 }
 
+function useState(initialState) {
+    const oldHook = workInProgressFiber.alternate
+        && workInProgressFiber.alternate.hooks && workInProgressFiber.alternate.hooks[hooksIndex]
+    
+    const hook = {
+        state: oldHook ? oldHook.state : initialState,
+        queue: []
+    }
+
+    const actions = oldHook ? oldHook.queue : []
+    actions.forEach(action => {
+        hook.state = action(hook.state)
+    })
+
+    const setState = action => {
+        hook.queue.push(action)
+        // do like in render so workloop starts a new render phase
+        workInProgressRoot = {
+            domNode: currentRoot.domNode,
+            props: currentRoot.props,
+            alternate: currentRoot
+        }
+        nextUnitOfWork = workInProgressRoot
+        deletions = []
+    }
+
+    workInProgressFiber.hooks.push(hook)
+    hooksIndex++
+    return [hook.state, setState]
+}
+
 // Export our glorious React Dummy
 export default DummyReact = {
     createElement,
     render,
+    useState
 };
